@@ -4,49 +4,200 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Save Code Generator</title>
+
     <style>
         body {
             font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 40px;
+        }
+
+        h1 {
             text-align: center;
-            margin-top: 50px;
+            margin-bottom: 40px;
         }
-        #code {
-            font-size: 24px;
+
+        .container {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+        }
+
+        .panel {
+            background: white;
+            padding: 25px;
+            width: 340px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .panel h2 {
+            margin-top: 0;
+        }
+
+        .field {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
             font-weight: bold;
-            margin: 20px 0;
-            color: #2c3e50;
         }
+
+        select, input {
+            width: 100%;
+            padding: 8px;
+            font-size: 16px;
+        }
+
         button {
-            padding: 10px 20px;
-            font-size: 18px;
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            margin-top: 10px;
             cursor: pointer;
             border: none;
             border-radius: 5px;
             background-color: #3498db;
             color: white;
         }
+
         button:hover {
             background-color: #2980b9;
+        }
+
+        .secondary {
+            background-color: #2ecc71;
+        }
+
+        .secondary:hover {
+            background-color: #27ae60;
+        }
+
+        .output {
+            margin-top: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            color: #2c3e50;
+            letter-spacing: 2px;
+        }
+
+        .decoded {
+            margin-top: 15px;
+            font-size: 16px;
+            line-height: 1.6;
         }
     </style>
 </head>
 <body>
 
-    <h1>Random Save Code Generator</h1>
-    <div id="code">Click "Generate" to get a code</div>
-    <button onclick="generateCode()">Generate Save Code</button>
+<h1>Save Code Generator & Decoder</h1>
 
-    <script>
-        function generateCode() {
-            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            let code = '';
-            for (let i = 0; i < 16; i++) {
-                const randomIndex = Math.floor(Math.random() * characters.length);
-                code += characters[randomIndex];
-            }
-            document.getElementById('code').textContent = code;
+<div class="container">
+
+    <!-- LEFT: GENERATOR -->
+    <div class="panel">
+        <h2>Create Save Code</h2>
+
+        <div class="field">
+            <label>Trees</label>
+            <select id="trees"></select>
+        </div>
+
+        <div class="field">
+            <label>Ponds</label>
+            <select id="ponds"></select>
+        </div>
+
+        <div class="field">
+            <label>Rocks</label>
+            <select id="rocks"></select>
+        </div>
+
+        <div class="field">
+            <label>NPCs</label>
+            <select id="npcs"></select>
+        </div>
+
+        <button onclick="generateSaveCode()">Generate Save Code</button>
+        <button class="secondary" onclick="copySaveCode()">Copy Save Code</button>
+
+        <div class="output" id="saveCodeOutput">--------</div>
+    </div>
+
+    <!-- RIGHT: DECODER -->
+    <div class="panel">
+        <h2>Enter Save Code</h2>
+
+        <div class="field">
+            <label>Save Code (8 digits)</label>
+            <input type="text" id="saveCodeInput" maxlength="8" placeholder="e.g. 12053409">
+        </div>
+
+        <button onclick="decodeSaveCode()">Decrypt Save Code</button>
+
+        <div class="decoded" id="decodedOutput"></div>
+    </div>
+
+</div>
+
+<script>
+    const dropdownIds = ["trees", "ponds", "rocks", "npcs"];
+
+    // Populate dropdowns with 1–99 (zero-padded)
+    dropdownIds.forEach(id => {
+        const select = document.getElementById(id);
+        for (let i = 1; i <= 99; i++) {
+            const option = document.createElement("option");
+            option.value = i.toString().padStart(2, "0");
+            option.textContent = i;
+            select.appendChild(option);
         }
-    </script>
+    });
+
+    function generateSaveCode() {
+        const trees = document.getElementById("trees").value;
+        const ponds = document.getElementById("ponds").value;
+        const rocks = document.getElementById("rocks").value;
+        const npcs = document.getElementById("npcs").value;
+
+        const saveCode = trees + ponds + rocks + npcs;
+        document.getElementById("saveCodeOutput").textContent = saveCode;
+    }
+
+    function copySaveCode() {
+        const code = document.getElementById("saveCodeOutput").textContent;
+        if (code.includes("-")) return;
+
+        navigator.clipboard.writeText(code);
+        alert("Save code copied to clipboard!");
+    }
+
+    function decodeSaveCode() {
+        const code = document.getElementById("saveCodeInput").value;
+        const output = document.getElementById("decodedOutput");
+
+        if (!/^\d{8}$/.test(code)) {
+            output.textContent = "Invalid save code. Must be exactly 8 digits.";
+            return;
+        }
+
+        const trees = parseInt(code.slice(0, 2));
+        const ponds = parseInt(code.slice(2, 4));
+        const rocks = parseInt(code.slice(4, 6));
+        const npcs = parseInt(code.slice(6, 8));
+
+        output.innerHTML = `
+            ${trees} Trees<br>
+            ${ponds} Ponds<br>
+            ${rocks} Rocks<br>
+            ${npcs} NPCs
+        `;
+    }
+</script>
 
 </body>
 </html>
