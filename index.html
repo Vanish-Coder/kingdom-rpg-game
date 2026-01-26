@@ -137,7 +137,7 @@
             <input type="text" id="saveCodeInput" maxlength="8" placeholder="e.g. 12053409">
         </div>
 
-        <button onclick="decodeSaveCode()">Decrypt Save Code</button>
+        <button onclick="decodeSaveCode()">Generate Using Save Code</button>
 
         <div class="decoded" id="decodedOutput"></div>
     </div>
@@ -173,7 +173,7 @@
         if (code.includes("-")) return;
 
         navigator.clipboard.writeText(code);
-        alert("Save code copied to clipboard!");
+        alert("Save code is copied to clipboard.");
     }
 
     function decodeSaveCode() {
