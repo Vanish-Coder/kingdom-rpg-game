@@ -1,202 +1,227 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Save Code Generator</title>
+<meta charset="UTF-8" />
+<title>100-Day Game – Prototype</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #0b0b0f;
+    overflow: hidden;
+    font-family: monospace;
+    color: white;
+  }
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            margin: 0;
-            padding: 40px;
-        }
+  #ui {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    font-size: 14px;
+  }
 
-        h1 {
-            text-align: center;
-            margin-bottom: 40px;
-        }
+  #game {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+    filter: blur(0px);
+    transition: filter 0.2s;
+  }
 
-        .container {
-            display: flex;
-            gap: 40px;
-            justify-content: center;
-        }
+  /* Fake vignette */
+  #vignette {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.8) 100%);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
 
-        .panel {
-            background: white;
-            padding: 25px;
-            width: 340px;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
+  .player {
+    position: absolute;
+    width: 30px;
+    height: 40px;
+    background: #eaeaea;
+    border-radius: 6px;
+    transform-origin: bottom center;
+    box-shadow: 0 10px 0 rgba(0,0,0,0.3);
+  }
 
-        .panel h2 {
-            margin-top: 0;
-        }
+  .mission {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    background: #6cf;
+    border-radius: 4px;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.3);
+  }
 
-        .field {
-            margin-bottom: 15px;
-        }
+  .floor {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(#151520 1px, transparent 1px),
+      linear-gradient(90deg, #151520 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
 
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-
-        select, input {
-            width: 100%;
-            padding: 8px;
-            font-size: 16px;
-        }
-
-        button {
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            margin-top: 10px;
-            cursor: pointer;
-            border: none;
-            border-radius: 5px;
-            background-color: #3498db;
-            color: white;
-        }
-
-        button:hover {
-            background-color: #2980b9;
-        }
-
-        .secondary {
-            background-color: #2ecc71;
-        }
-
-        .secondary:hover {
-            background-color: #27ae60;
-        }
-
-        .output {
-            margin-top: 15px;
-            font-size: 20px;
-            font-weight: bold;
-            text-align: center;
-            color: #2c3e50;
-            letter-spacing: 2px;
-        }
-
-        .decoded {
-            margin-top: 15px;
-            font-size: 16px;
-            line-height: 1.6;
-        }
-    </style>
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    text-align: center;
+    z-index: 20;
+    display: none;
+  }
+</style>
 </head>
 <body>
 
-<h1>Save Code Generator - A Basic Test of Save Code Implemention for RPG Worlds</h1>
-
-<div class="container">
-
-    <!-- LEFT: GENERATOR -->
-    <div class="panel">
-        <h2>Create Save Code</h2>
-
-        <div class="field">
-            <label>Trees</label>
-            <select id="trees"></select>
-        </div>
-
-        <div class="field">
-            <label>Ponds</label>
-            <select id="ponds"></select>
-        </div>
-
-        <div class="field">
-            <label>Rocks</label>
-            <select id="rocks"></select>
-        </div>
-
-        <div class="field">
-            <label>NPCs</label>
-            <select id="npcs"></select>
-        </div>
-
-        <button onclick="generateSaveCode()">Generate Save Code</button>
-        <button class="secondary" onclick="copySaveCode()">Copy Save Code</button>
-
-        <div class="output" id="saveCodeOutput">--------</div>
-    </div>
-
-    <!-- RIGHT: DECODER -->
-    <div class="panel">
-        <h2>Enter Save Code</h2>
-
-        <div class="field">
-            <label>Save Code (8 digits)</label>
-            <input type="text" id="saveCodeInput" maxlength="8" placeholder="e.g. 12053409">
-        </div>
-
-        <button onclick="decodeSaveCode()">Generate World Using Save Code</button>
-
-        <div class="decoded" id="decodedOutput"></div>
-    </div>
-
+<div id="ui">
+  <div>Day: <span id="day">1</span></div>
+  <div>Time Left: <span id="time">60</span></div>
+  <div>Missions Left: <span id="missions">0</span></div>
+  <div>Insanity: <span id="insanity">0%</span></div>
 </div>
 
+<div id="game">
+  <div class="floor"></div>
+  <div id="player" class="player"></div>
+</div>
+
+<div id="vignette"></div>
+<div id="overlay"></div>
+
 <script>
-    const dropdownIds = ["trees", "ponds", "rocks", "npcs"];
+const game = document.getElementById("game");
+const playerEl = document.getElementById("player");
+const vignette = document.getElementById("vignette");
+const overlay = document.getElementById("overlay");
 
-    // Populate dropdowns with 1–99 (zero-padded)
-    dropdownIds.forEach(id => {
-        const select = document.getElementById(id);
-        for (let i = 1; i <= 99; i++) {
-            const option = document.createElement("option");
-            option.value = i.toString().padStart(2, "0");
-            option.textContent = i;
-            select.appendChild(option);
-        }
-    });
+let day = 1;
+let timeLeft = 60;
+let insanity = 0;
+let missions = [];
+let keys = {};
 
-    function generateSaveCode() {
-        const trees = document.getElementById("trees").value;
-        const ponds = document.getElementById("ponds").value;
-        const rocks = document.getElementById("rocks").value;
-        const npcs = document.getElementById("npcs").value;
+const player = {
+  x: window.innerWidth / 2,
+  y: window.innerHeight / 2,
+  speed: 2.2
+};
 
-        const saveCode = trees + ponds + rocks + npcs;
-        document.getElementById("saveCodeOutput").textContent = saveCode;
+function spawnMissions(count) {
+  missions.forEach(m => m.el.remove());
+  missions = [];
+
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement("div");
+    el.className = "mission";
+    const x = Math.random() * (window.innerWidth - 50) + 25;
+    const y = Math.random() * (window.innerHeight - 80) + 40;
+    el.style.left = x + "px";
+    el.style.top = y + "px";
+    game.appendChild(el);
+    missions.push({ x, y, el });
+  }
+}
+
+function startNight() {
+  timeLeft = 60;
+  insanity = 0;
+  spawnMissions(3 + Math.floor(day / 3));
+  overlay.style.display = "none";
+}
+
+function endNight(success) {
+  overlay.style.display = "flex";
+  overlay.innerHTML = success
+    ? `Day ${day} Complete<br><small>The school looks normal.</small>`
+    : `You Dissolve Into Shadows<br><small>Try again.</small>`;
+
+  if (success) day++;
+
+  setTimeout(startNight, 2500);
+}
+
+function updatePlayer() {
+  let dx = 0, dy = 0;
+  if (keys["w"] || keys["ArrowUp"]) dy--;
+  if (keys["s"] || keys["ArrowDown"]) dy++;
+  if (keys["a"] || keys["ArrowLeft"]) dx--;
+  if (keys["d"] || keys["ArrowRight"]) dx++;
+
+  const speed = player.speed * (1 - insanity / 150);
+  player.x += dx * speed;
+  player.y += dy * speed;
+
+  player.x = Math.max(0, Math.min(window.innerWidth - 30, player.x));
+  player.y = Math.max(0, Math.min(window.innerHeight - 40, player.y));
+
+  const scale = 0.9 + (player.y / window.innerHeight) * 0.2;
+  playerEl.style.transform = `scale(${scale})`;
+  playerEl.style.left = player.x + "px";
+  playerEl.style.top = player.y + "px";
+}
+
+function checkMissions() {
+  missions = missions.filter(m => {
+    const dist = Math.hypot(player.x - m.x, player.y - m.y);
+    if (dist < 30) {
+      m.el.remove();
+      return false;
     }
+    return true;
+  });
 
-    function copySaveCode() {
-        const code = document.getElementById("saveCodeOutput").textContent;
-        if (code.includes("-")) return;
+  document.getElementById("missions").textContent = missions.length;
+}
 
-        navigator.clipboard.writeText(code);
-        alert("Save code is copied to clipboard.");
-    }
+function updateInsanity() {
+  insanity += 0.08;
+  insanity = Math.min(insanity, 100);
 
-    function decodeSaveCode() {
-        const code = document.getElementById("saveCodeInput").value;
-        const output = document.getElementById("decodedOutput");
+  document.getElementById("insanity").textContent =
+    Math.floor(insanity) + "%";
 
-        if (!/^\d{8}$/.test(code)) {
-            output.textContent = "Invalid Save Code. Must be 8 digits.";
-            return;
-        }
+  game.style.filter = `blur(${insanity / 25}px)`;
+  vignette.style.opacity = insanity / 120;
+}
 
-        const trees = parseInt(code.slice(0, 2));
-        const ponds = parseInt(code.slice(2, 4));
-        const rocks = parseInt(code.slice(4, 6));
-        const npcs = parseInt(code.slice(6, 8));
+function updateTimer() {
+  timeLeft -= 1;
+  document.getElementById("time").textContent = timeLeft;
 
-        output.innerHTML = `
-            ${trees} Trees<br>
-            ${ponds} Ponds<br>
-            ${rocks} Rocks<br>
-            ${npcs} NPCs
-        `;
-    }
+  if (timeLeft <= 0) {
+    endNight(missions.length === 0);
+  }
+}
+
+function gameLoop() {
+  updatePlayer();
+  checkMissions();
+  updateInsanity();
+
+  if (missions.length === 0) {
+    endNight(true);
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+setInterval(updateTimer, 1000);
+startNight();
+gameLoop();
 </script>
 
 </body>
