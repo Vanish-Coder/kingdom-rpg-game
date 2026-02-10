@@ -1,138 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>100-Day Game – Prototype</title>
+<meta charset="UTF-8">
+<title>100-Day Game – 3D Prototype</title>
 <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: #0b0b0f;
-    overflow: hidden;
-    font-family: monospace;
-    color: white;
-  }
-
+  body { margin: 0; overflow: hidden; background: black; }
   #ui {
     position: fixed;
     top: 10px;
     left: 10px;
+    color: white;
+    font-family: monospace;
     z-index: 10;
-    font-size: 14px;
   }
-
-  #game {
-    width: 100vw;
-    height: 100vh;
-    position: relative;
-    overflow: hidden;
-    filter: blur(0px);
-    transition: filter 0.2s;
-  }
-
-  /* Fake vignette */
-  #vignette {
-    pointer-events: none;
-    position: fixed;
-    inset: 0;
-    background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.8) 100%);
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
-  .player {
-    position: absolute;
-    width: 30px;
-    height: 40px;
-    background: #eaeaea;
-    border-radius: 6px;
-    transform-origin: bottom center;
-    box-shadow: 0 10px 0 rgba(0,0,0,0.3);
-  }
-
-  .mission {
-    position: absolute;
-    width: 24px;
-    height: 24px;
-    background: #6cf;
-    border-radius: 4px;
-    box-shadow: 0 6px 0 rgba(0,0,0,0.3);
-  }
-
-  .floor {
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(#151520 1px, transparent 1px),
-      linear-gradient(90deg, #151520 1px, transparent 1px);
-    background-size: 40px 40px;
-  }
-
   #overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.85);
-    display: flex;
+    background: rgba(0,0,0,0.9);
+    color: white;
+    display: none;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
     text-align: center;
+    font-family: monospace;
+    font-size: 24px;
     z-index: 20;
-    display: none;
   }
 </style>
 </head>
 <body>
 
 <div id="ui">
-  <div>Day: <span id="day">1</span></div>
-  <div>Time Left: <span id="time">60</span></div>
-  <div>Missions Left: <span id="missions">0</span></div>
-  <div>Insanity: <span id="insanity">0%</span></div>
+  Day: <span id="day">1</span><br>
+  Time: <span id="time">60</span><br>
+  Missions: <span id="missions">0</span><br>
+  Insanity: <span id="insanity">0%</span>
 </div>
 
-<div id="game">
-  <div class="floor"></div>
-  <div id="player" class="player"></div>
-</div>
-
-<div id="vignette"></div>
 <div id="overlay"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
-const game = document.getElementById("game");
-const playerEl = document.getElementById("player");
-const vignette = document.getElementById("vignette");
-const overlay = document.getElementById("overlay");
+/* ---------- BASIC SETUP ---------- */
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x000000, 10, 60);
 
-let day = 1;
-let timeLeft = 60;
-let insanity = 0;
-let missions = [];
-let keys = {};
+const camera = new THREE.PerspectiveCamera(
+  75, window.innerWidth / window.innerHeight, 0.1, 1000
+);
 
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+/* ---------- LIGHTING ---------- */
+scene.add(new THREE.AmbientLight(0x404040));
+
+const moonLight = new THREE.DirectionalLight(0x8899ff, 0.8);
+moonLight.position.set(5, 10, 2);
+scene.add(moonLight);
+
+/* ---------- FLOOR (10x10 tiles) ---------- */
+const floorGroup = new THREE.Group();
+const tileSize = 5;
+
+for (let x = -5; x < 5; x++) {
+  for (let z = -5; z < 5; z++) {
+    const tile = new THREE.Mesh(
+      new THREE.BoxGeometry(tileSize, 0.2, tileSize),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a2a })
+    );
+    tile.position.set(x * tileSize, 0, z * tileSize);
+    floorGroup.add(tile);
+  }
+}
+scene.add(floorGroup);
+
+/* ---------- PLAYER ---------- */
 const player = {
-  x: window.innerWidth / 2,
-  y: window.innerHeight / 2,
-  speed: 2.2
+  pos: new THREE.Vector3(0, 1.7, 0),
+  vel: new THREE.Vector3(),
+  speed: 0.12,
+  yaw: 0,
+  pitch: 0
 };
+camera.position.copy(player.pos);
 
+/* ---------- MISSIONS ---------- */
+let missions = [];
 function spawnMissions(count) {
-  missions.forEach(m => m.el.remove());
+  missions.forEach(m => scene.remove(m));
   missions = [];
 
   for (let i = 0; i < count; i++) {
-    const el = document.createElement("div");
-    el.className = "mission";
-    const x = Math.random() * (window.innerWidth - 50) + 25;
-    const y = Math.random() * (window.innerHeight - 80) + 40;
-    el.style.left = x + "px";
-    el.style.top = y + "px";
-    game.appendChild(el);
-    missions.push({ x, y, el });
+    const cube = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({
+        color: 0x66ccff,
+        emissive: 0x223355
+      })
+    );
+    cube.position.set(
+      (Math.random() * 40) - 20,
+      1,
+      (Math.random() * 40) - 20
+    );
+    scene.add(cube);
+    missions.push(cube);
   }
 }
 
+/* ---------- GAME STATE ---------- */
+let day = 1;
+let timeLeft = 60;
+let insanity = 0;
+let keys = {};
+const overlay = document.getElementById("overlay");
+
+/* ---------- INPUT ---------- */
+document.addEventListener("click", () => {
+  document.body.requestPointerLock();
+});
+
+document.addEventListener("mousemove", e => {
+  if (document.pointerLockElement) {
+    player.yaw -= e.movementX * 0.002;
+    player.pitch -= e.movementY * 0.002;
+    player.pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, player.pitch));
+  }
+});
+
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+/* ---------- NIGHT LOOP ---------- */
 function startNight() {
   timeLeft = 60;
   insanity = 0;
@@ -144,85 +145,91 @@ function endNight(success) {
   overlay.style.display = "flex";
   overlay.innerHTML = success
     ? `Day ${day} Complete<br><small>The school looks normal.</small>`
-    : `You Dissolve Into Shadows<br><small>Try again.</small>`;
+    : `You Dissolve Into Shadows`;
 
-  if (success) day++;
+  if (success && day < 24) day++;
 
   setTimeout(startNight, 2500);
 }
 
+/* ---------- UPDATE ---------- */
 function updatePlayer() {
-  let dx = 0, dy = 0;
-  if (keys["w"] || keys["ArrowUp"]) dy--;
-  if (keys["s"] || keys["ArrowDown"]) dy++;
-  if (keys["a"] || keys["ArrowLeft"]) dx--;
-  if (keys["d"] || keys["ArrowRight"]) dx++;
+  const dir = new THREE.Vector3();
+  if (keys["w"]) dir.z -= 1;
+  if (keys["s"]) dir.z += 1;
+  if (keys["a"]) dir.x -= 1;
+  if (keys["d"]) dir.x += 1;
+
+  dir.normalize();
+  dir.applyAxisAngle(new THREE.Vector3(0,1,0), player.yaw);
 
   const speed = player.speed * (1 - insanity / 150);
-  player.x += dx * speed;
-  player.y += dy * speed;
+  player.pos.addScaledVector(dir, speed);
 
-  player.x = Math.max(0, Math.min(window.innerWidth - 30, player.x));
-  player.y = Math.max(0, Math.min(window.innerHeight - 40, player.y));
+  camera.position.copy(player.pos);
+  camera.rotation.set(player.pitch, player.yaw, 0);
+}
 
-  const scale = 0.9 + (player.y / window.innerHeight) * 0.2;
-  playerEl.style.transform = `scale(${scale})`;
-  playerEl.style.left = player.x + "px";
-  playerEl.style.top = player.y + "px";
+function updateInsanity() {
+  insanity = Math.min(insanity + 0.05, 100);
+  camera.fov = 75 + Math.sin(performance.now() * 0.002) * insanity * 0.1;
+  camera.updateProjectionMatrix();
 }
 
 function checkMissions() {
   missions = missions.filter(m => {
-    const dist = Math.hypot(player.x - m.x, player.y - m.y);
-    if (dist < 30) {
-      m.el.remove();
+    if (m.position.distanceTo(player.pos) < 1.5) {
+      scene.remove(m);
       return false;
     }
     return true;
   });
-
-  document.getElementById("missions").textContent = missions.length;
 }
 
-function updateInsanity() {
-  insanity += 0.08;
-  insanity = Math.min(insanity, 100);
-
-  document.getElementById("insanity").textContent =
-    Math.floor(insanity) + "%";
-
-  game.style.filter = `blur(${insanity / 25}px)`;
-  vignette.style.opacity = insanity / 120;
+function updateUI() {
+  dayEl.textContent = day;
+  timeEl.textContent = timeLeft;
+  missionsEl.textContent = missions.length;
+  insanityEl.textContent = Math.floor(insanity) + "%";
 }
 
-function updateTimer() {
-  timeLeft -= 1;
-  document.getElementById("time").textContent = timeLeft;
-
+/* ---------- TIMER ---------- */
+setInterval(() => {
+  timeLeft--;
   if (timeLeft <= 0) {
     endNight(missions.length === 0);
   }
-}
+}, 1000);
 
-function gameLoop() {
+/* ---------- MAIN LOOP ---------- */
+function animate() {
   updatePlayer();
-  checkMissions();
   updateInsanity();
+  checkMissions();
+  updateUI();
 
   if (missions.length === 0) {
     endNight(true);
   }
 
-  requestAnimationFrame(gameLoop);
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
 }
 
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
+/* ---------- INIT ---------- */
+const dayEl = document.getElementById("day");
+const timeEl = document.getElementById("time");
+const missionsEl = document.getElementById("missions");
+const insanityEl = document.getElementById("insanity");
 
-setInterval(updateTimer, 1000);
 startNight();
-gameLoop();
-</script>
+animate();
 
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
 </body>
 </html>
