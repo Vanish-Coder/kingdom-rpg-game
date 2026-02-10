@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>100-Day Game – 3D Prototype</title>
+<title>100-Day Game – School Prototype</title>
 <style>
   body { margin: 0; overflow: hidden; background: black; }
   #ui {
@@ -12,6 +12,7 @@
     color: white;
     font-family: monospace;
     z-index: 10;
+    font-size: 14px;
   }
   #overlay {
     position: fixed;
@@ -33,7 +34,7 @@
 <div id="ui">
   Day: <span id="day">1</span><br>
   Time: <span id="time">60</span><br>
-  Missions: <span id="missions">0</span><br>
+  Tasks Remaining: <span id="missions">0</span><br>
   Insanity: <span id="insanity">0%</span>
 </div>
 
@@ -41,195 +42,184 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
-/* ---------- BASIC SETUP ---------- */
+/* ---------- SCENE ---------- */
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x000000, 10, 60);
+scene.fog = new THREE.Fog(0x000000, 15, 80);
 
-const camera = new THREE.PerspectiveCamera(
-  75, window.innerWidth / window.innerHeight, 0.1, 1000
-);
-
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
 /* ---------- LIGHTING ---------- */
-scene.add(new THREE.AmbientLight(0x404040));
+scene.add(new THREE.AmbientLight(0x404040, 0.5));
 
-const moonLight = new THREE.DirectionalLight(0x8899ff, 0.8);
-moonLight.position.set(5, 10, 2);
-scene.add(moonLight);
-
-/* ---------- FLOOR (10x10 tiles) ---------- */
-const floorGroup = new THREE.Group();
-const tileSize = 5;
-
-for (let x = -5; x < 5; x++) {
-  for (let z = -5; z < 5; z++) {
-    const tile = new THREE.Mesh(
-      new THREE.BoxGeometry(tileSize, 0.2, tileSize),
-      new THREE.MeshStandardMaterial({ color: 0x1a1a2a })
-    );
-    tile.position.set(x * tileSize, 0, z * tileSize);
-    floorGroup.add(tile);
-  }
+const lights = [];
+for (let i = -4; i <= 4; i++) {
+  const light = new THREE.PointLight(0xffffff, 0.8, 20);
+  light.position.set(0, 4, i * 8);
+  scene.add(light);
+  lights.push(light);
 }
-scene.add(floorGroup);
+
+/* ---------- SCHOOL HALLWAY ---------- */
+function wall(w,h,d,x,y,z,color=0xb0b0b0){
+  const m = new THREE.Mesh(
+    new THREE.BoxGeometry(w,h,d),
+    new THREE.MeshStandardMaterial({ color })
+  );
+  m.position.set(x,y,z);
+  scene.add(m);
+}
+
+function floor(w,d,x,z){
+  wall(w,0.2,d,x,0,z,0x888888);
+}
+
+floor(10,80,0,0);
+wall(0.3,4,80,-5,2,0);
+wall(0.3,4,80,5,2,0);
+
+/* ---------- CLASSROOMS ---------- */
+for (let z of [-20, 0, 20]) {
+  wall(10,4,0.3,0,2,z+6);
+  wall(0.3,4,6,-5,2,z+3);
+  wall(0.3,4,6,5,2,z+3);
+}
 
 /* ---------- PLAYER ---------- */
 const player = {
-  pos: new THREE.Vector3(0, 1.7, 0),
-  vel: new THREE.Vector3(),
-  speed: 0.12,
+  pos: new THREE.Vector3(0,1.7,30),
   yaw: 0,
-  pitch: 0
+  pitch: 0,
+  speed: 0.12
 };
 camera.position.copy(player.pos);
 
-/* ---------- MISSIONS ---------- */
-let missions = [];
-function spawnMissions(count) {
-  missions.forEach(m => scene.remove(m));
-  missions = [];
+/* ---------- WEIRD TASK OBJECTS ---------- */
+let tasks = [];
+function spawnTasks(count){
+  tasks.forEach(t=>scene.remove(t.mesh));
+  tasks = [];
 
-  for (let i = 0; i < count; i++) {
-    const cube = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshStandardMaterial({
-        color: 0x66ccff,
-        emissive: 0x223355
-      })
+  for(let i=0;i<count;i++){
+    const geo = new THREE.BoxGeometry(0.6,0.6,0.6);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0x2222aa
+    });
+    const mesh = new THREE.Mesh(geo,mat);
+    mesh.position.set(
+      (Math.random()*6)-3,
+      1.2,
+      (Math.random()*60)-30
     );
-    cube.position.set(
-      (Math.random() * 40) - 20,
-      1,
-      (Math.random() * 40) - 20
-    );
-    scene.add(cube);
-    missions.push(cube);
+    scene.add(mesh);
+    tasks.push({mesh, phase: Math.random()*Math.PI*2});
   }
 }
 
 /* ---------- GAME STATE ---------- */
-let day = 1;
-let timeLeft = 60;
-let insanity = 0;
-let keys = {};
-const overlay = document.getElementById("overlay");
+let day=1, timeLeft=60, insanity=0;
+const keys={};
+const overlay=document.getElementById("overlay");
 
 /* ---------- INPUT ---------- */
-document.addEventListener("click", () => {
-  document.body.requestPointerLock();
-});
-
-document.addEventListener("mousemove", e => {
-  if (document.pointerLockElement) {
-    player.yaw -= e.movementX * 0.002;
-    player.pitch -= e.movementY * 0.002;
-    player.pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, player.pitch));
+document.addEventListener("click",()=>document.body.requestPointerLock());
+document.addEventListener("mousemove",e=>{
+  if(document.pointerLockElement){
+    player.yaw-=e.movementX*0.002;
+    player.pitch-=e.movementY*0.002;
+    player.pitch=Math.max(-1.5,Math.min(1.5,player.pitch));
   }
 });
-
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
 
 /* ---------- NIGHT LOOP ---------- */
-function startNight() {
-  timeLeft = 60;
-  insanity = 0;
-  spawnMissions(3 + Math.floor(day / 3));
-  overlay.style.display = "none";
+function startNight(){
+  timeLeft=60;
+  insanity=0;
+  spawnTasks(3+Math.floor(day/4));
+  overlay.style.display="none";
 }
 
-function endNight(success) {
-  overlay.style.display = "flex";
-  overlay.innerHTML = success
-    ? `Day ${day} Complete<br><small>The school looks normal.</small>`
-    : `You Dissolve Into Shadows`;
-
-  if (success && day < 24) day++;
-
-  setTimeout(startNight, 2500);
+function endNight(win){
+  overlay.style.display="flex";
+  overlay.innerHTML=win
+    ? `Day ${day} Complete<br><small>The school is normal again.</small>`
+    : `You waited too long.`;
+  if(win && day<24) day++;
+  setTimeout(startNight,2500);
 }
 
 /* ---------- UPDATE ---------- */
-function updatePlayer() {
-  const dir = new THREE.Vector3();
-  if (keys["w"]) dir.z -= 1;
-  if (keys["s"]) dir.z += 1;
-  if (keys["a"]) dir.x -= 1;
-  if (keys["d"]) dir.x += 1;
+function updatePlayer(){
+  let dx=0,dz=0;
+  if(keys.w)dz--;
+  if(keys.s)dz++;
+  if(keys.a)dx--;
+  if(keys.d)dx++;
 
-  dir.normalize();
-  dir.applyAxisAngle(new THREE.Vector3(0,1,0), player.yaw);
-
-  const speed = player.speed * (1 - insanity / 150);
-  player.pos.addScaledVector(dir, speed);
+  const dir=new THREE.Vector3(dx,0,dz).normalize();
+  dir.applyAxisAngle(new THREE.Vector3(0,1,0),player.yaw);
+  player.pos.addScaledVector(dir,player.speed*(1-insanity/150));
 
   camera.position.copy(player.pos);
-  camera.rotation.set(player.pitch, player.yaw, 0);
+  camera.rotation.set(player.pitch,player.yaw,0);
 }
 
-function updateInsanity() {
-  insanity = Math.min(insanity + 0.05, 100);
-  camera.fov = 75 + Math.sin(performance.now() * 0.002) * insanity * 0.1;
-  camera.updateProjectionMatrix();
-}
-
-function checkMissions() {
-  missions = missions.filter(m => {
-    if (m.position.distanceTo(player.pos) < 1.5) {
-      scene.remove(m);
+function updateTasks(){
+  tasks=tasks.filter(t=>{
+    t.phase+=0.03;
+    t.mesh.position.y=1.2+Math.sin(t.phase)*0.2;
+    if(t.mesh.position.distanceTo(player.pos)<1.4){
+      scene.remove(t.mesh);
       return false;
     }
     return true;
   });
 }
 
-function updateUI() {
-  dayEl.textContent = day;
-  timeEl.textContent = timeLeft;
-  missionsEl.textContent = missions.length;
-  insanityEl.textContent = Math.floor(insanity) + "%";
+function updateInsanity(){
+  insanity=Math.min(insanity+0.04,100);
+  camera.fov=75+Math.sin(performance.now()*0.002)*insanity*0.15;
+  camera.updateProjectionMatrix();
+  lights.forEach(l=>l.intensity=0.8-Math.sin(insanity*0.1)*0.2);
+}
+
+function updateUI(){
+  dayEl.textContent=day;
+  timeEl.textContent=timeLeft;
+  missionsEl.textContent=tasks.length;
+  insanityEl.textContent=Math.floor(insanity)+"%";
 }
 
 /* ---------- TIMER ---------- */
-setInterval(() => {
+setInterval(()=>{
   timeLeft--;
-  if (timeLeft <= 0) {
-    endNight(missions.length === 0);
-  }
-}, 1000);
+  if(timeLeft<=0) endNight(tasks.length===0);
+},1000);
 
-/* ---------- MAIN LOOP ---------- */
-function animate() {
+/* ---------- LOOP ---------- */
+function loop(){
   updatePlayer();
+  updateTasks();
   updateInsanity();
-  checkMissions();
   updateUI();
-
-  if (missions.length === 0) {
-    endNight(true);
-  }
-
-  renderer.render(scene, camera);
-  requestAnimationFrame(animate);
+  if(tasks.length===0) endNight(true);
+  renderer.render(scene,camera);
+  requestAnimationFrame(loop);
 }
 
 /* ---------- INIT ---------- */
-const dayEl = document.getElementById("day");
-const timeEl = document.getElementById("time");
-const missionsEl = document.getElementById("missions");
-const insanityEl = document.getElementById("insanity");
+const dayEl=document.getElementById("day");
+const timeEl=document.getElementById("time");
+const missionsEl=document.getElementById("missions");
+const insanityEl=document.getElementById("insanity");
 
 startNight();
-animate();
-
-window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+loop();
 </script>
 </body>
 </html>
