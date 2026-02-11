@@ -2,23 +2,30 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>100-Day School Prototype – Bright + Jump + Sprint</title>
+<title>100-Day School Prototype – Night Horror</title>
 <style>
-  body { margin: 0; overflow: hidden; background: #87ceeb; } /* Sky blue background */
+  body { 
+    margin: 0; 
+    overflow: hidden; 
+    background: #05070a; 
+  }
+
   #ui {
     position: fixed;
     top: 10px;
     left: 10px;
-    color: black;
+    color: #cfcfcf;
     font-family: monospace;
     z-index: 10;
     font-size: 14px;
+    text-shadow: 0 0 4px rgba(255,0,0,0.3);
   }
+
   #overlay {
     position: fixed;
     inset: 0;
-    background: rgba(255,255,255,0.9);
-    color: black;
+    background: rgba(0,0,0,0.92);
+    color: #e0e0e0;
     display: none;
     align-items: center;
     justify-content: center;
@@ -26,6 +33,7 @@
     font-family: monospace;
     font-size: 24px;
     z-index: 20;
+    text-shadow: 0 0 8px rgba(255,0,0,0.5);
   }
 </style>
 </head>
@@ -44,23 +52,24 @@
 <script>
 /* ---------- SCENE SETUP ---------- */
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87ceeb); // bright sky blue
+scene.background = new THREE.Color(0x05070a); // near-black blue
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x05070a);
 document.body.appendChild(renderer.domElement);
 
 /* ---------- LIGHTING ---------- */
-const ambient = new THREE.AmbientLight(0xffffff, 1.0);
+const ambient = new THREE.AmbientLight(0x223344, 0.35);
 scene.add(ambient);
 
-const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-sun.position.set(10, 20, 10);
-scene.add(sun);
+const moon = new THREE.DirectionalLight(0x8899aa, 0.6);
+moon.position.set(-10, 15, 5);
+scene.add(moon);
 
 /* ---------- SCHOOL HALLWAY ---------- */
-function wall(w,h,d,x,y,z,color=0xd3d3d3){
+function wall(w,h,d,x,y,z,color=0x1a1a1a){
     const m = new THREE.Mesh(
         new THREE.BoxGeometry(w,h,d),
         new THREE.MeshStandardMaterial({color})
@@ -69,20 +78,20 @@ function wall(w,h,d,x,y,z,color=0xd3d3d3){
     scene.add(m);
 }
 
-function floor(w,d,x,z,color=0xffffff){
+function floor(w,d,x,z,color=0x0f0f0f){
     wall(w,0.2,d,x,0,z,color);
 }
 
 // Floor and side walls
-floor(10,80,0,0,0xffffff);
-wall(0.3,4,80,-5,2,0);
-wall(0.3,4,80,5,2,0);
+floor(10,80,0,0);
+wall(0.3,4,80,-5,2,0,0x141414);
+wall(0.3,4,80,5,2,0,0x141414);
 
 // Classrooms
 for(let z of [-20,0,20]){
-    wall(10,4,0.3,0,2,z+6); // back wall
-    wall(0.3,4,6,-5,2,z+3); // left wall
-    wall(0.3,4,6,5,2,z+3); // right wall
+    wall(10,4,0.3,0,2,z+6,0x181818);
+    wall(0.3,4,6,-5,2,z+3,0x151515);
+    wall(0.3,4,6,5,2,z+3,0x151515);
 }
 
 /* ---------- PLAYER ---------- */
@@ -105,7 +114,11 @@ function spawnTasks(count){
     tasks = [];
     for(let i=0;i<count;i++){
         const geo = new THREE.BoxGeometry(0.6,0.6,0.6);
-        const mat = new THREE.MeshStandardMaterial({color:0xffa500,emissive:0x883300});
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0x550000,
+            emissive: 0xaa0000,
+            emissiveIntensity: 0.6
+        });
         const mesh = new THREE.Mesh(geo,mat);
         mesh.position.set(
             (Math.random()*6)-3,
@@ -145,7 +158,7 @@ function startNight(){
 function endNight(win){
     overlay.style.display="flex";
     overlay.innerHTML=win
-        ? `Day ${day} Complete<br><small>The school is normal again.</small>`
+        ? `Day ${day} Complete<br><small>The school sleeps…</small>`
         : `You waited too long.`;
     if(win && day<24) day++;
     setTimeout(startNight,2500);
@@ -153,10 +166,8 @@ function endNight(win){
 
 /* ---------- UPDATE ---------- */
 function updatePlayer(){
-    // Sprint
     player.sprintMult = keys["shift"] ? 2.0 : 1.0;
 
-    // Movement
     let dx=0,dz=0;
     if(keys["w"]) dz--;
     if(keys["s"]) dz++;
@@ -167,12 +178,11 @@ function updatePlayer(){
     dir.applyAxisAngle(new THREE.Vector3(0,1,0),player.yaw);
     player.pos.addScaledVector(dir,player.speed*player.sprintMult);
 
-    // Jump
     if(keys[" "] && player.onGround){
         player.jumpVel=0.25;
         player.onGround=false;
     }
-    player.jumpVel-=0.01; // gravity
+    player.jumpVel-=0.01;
     player.pos.y += player.jumpVel;
     if(player.pos.y<1.7){
         player.pos.y=1.7;
